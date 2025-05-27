@@ -10,6 +10,15 @@ fn trim_outer_quotes(s: &mut String) -> String {
     s.clone()
 }
 
+fn trim_full_stop(s: &mut String) -> String {
+    let mut s_iter = s.split(".");
+    let s_upper_section = s_iter
+        .next()
+        .expect("Failed to trim whitespace")
+        .to_string();
+    s_upper_section.clone()
+}
+
 fn print_color_and_desc(v: &Value) {
     let lines_to_colors: HashMap<String, [u8; 3]> = HashMap::from([
         ("Bakerloo".to_string(), [178, 99, 0]),
