@@ -1,0 +1,58 @@
+name: Release Multiplatform Rust Binaries
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Install cross
+        run: cargo install cross
+
+      - name: Add targets
+        run: |
+          rustup target add x86_64-unknown-linux-gnu
+          rustup target add x86_64-pc-windows-gnu
+          rustup target add x86_64-apple-darwin
+
+      - name: Build for Linux
+        run: cross build --release --target x86_64-unknown-linux-gnu
+
+      - name: Build for Windows
+        run: cross build --release --target x86_64-pc-windows-gnu
+
+      - name: Build for macOS
+        run: cross build --release --target x86_64-apple-darwin
+
+      - name: Upload Linux Binary
+        uses: https://gitea.com/actions/upload-release-asset@v1
+        with:
+          tag: ${{ gitea.ref_name }}
+          asset_path: target/x86_64-unknown-linux-gnu/release/get_london_underground
+          asset_name: get_london_underground-linux
+
+      - name: Upload Windows Binary
+        uses: https://gitea.com/actions/upload-release-asset@v1
+        with:
+          tag: ${{ gitea.ref_name }}
+          asset_path: target/x86_64-pc-windows-gnu/release/get_london_underground.exe
+          asset_name: get_london_underground-windows.exe
+
+      - name: Upload macOS Binary
+        uses: https://gitea.com/actions/upload-release-asset@v1
+        with:
+          tag: ${{ gitea.ref_name }}
+          asset_path: target/x86_64-apple-darwin/release/get_london_underground
+          asset_name: get_london_underground-macos
