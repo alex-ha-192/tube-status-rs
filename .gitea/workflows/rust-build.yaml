@@ -15,7 +15,6 @@ jobs:
 
     strategy:
       matrix:
-        # You can add more, for any target you'd like!
         include:
           - build: linux
             os: ubuntu-latest
@@ -37,12 +36,25 @@ jobs:
         shell: bash
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
+      - name: Install platform-specific dependencies
+        shell: bash
+        run: |
+          if [[ "${{ matrix.target }}" == "x86_64-unknown-linux-musl" ]]; then
+            sudo apt-get update
+            sudo apt-get install -y musl-tools pkg-config libssl-dev
+            echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
+            echo "OPENSSL_DIR=/usr" >> $GITHUB_ENV
+          elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            brew install openssl@3
+            echo "OPENSSL_NO_VENDOR=1" >> $GITHUB_ENV
+            echo "OPENSSL_DIR=$(brew --prefix openssl@3)" >> $GITHUB_ENV
+          elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
+          fi
+
       - name: Install Rust
-        # Or @nightly if you want
         uses: dtolnay/rust-toolchain@stable
-        # Arguments to pass in
         with:
-          # Make Rust compile to our target (defined in the matrix)
           targets: ${{ matrix.target }}
 
       - name: Build
@@ -55,30 +67,23 @@ jobs:
       - name: Build archive
         shell: bash
         run: |
-          # Replace with the name of your binary
           binary_name="get_london_underground"
-
           dirname="$binary_name-${{ env.VERSION }}-${{ matrix.target }}"
           mkdir "$dirname"
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            mv "target/${{ matrix.target }}/release/$binary_name.exe" "$dirname"
-          else
-            mv "target/${{ matrix.target }}/release/$binary_name" "$dirname"
-          fi
-          ls
-          mv "$dirname/$binary_name" "$dirname/$binary_name-${{ env.VERSION }}"
-          echo "ASSET=$dirname/$binary_name-${{ env.VERSION }}" >> $GITHUB_ENV
 
-      #     if [ "${{ matrix.os }}" = "windows-latest" ]; then
-      #       7z a "$dirname.zip" "$dirname"
-      #       echo "ASSET=$dirname.zip" >> $GITHUB_ENV
-      #     else
-      #       tar -czf "$dirname.tar.gz" "$dirname"
-      #       echo "ASSET=$dirname.tar.gz" >> $GITHUB_ENV
-      #     fi
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            binpath="target/${{ matrix.target }}/release/${binary_name}.exe"
+            mv "$binpath" "$dirname/${binary_name}-${{ env.VERSION }}.exe"
+            echo "ASSET=$dirname/${binary_name}-${{ env.VERSION }}.exe" >> $GITHUB_ENV
+          else
+            binpath="target/${{ matrix.target }}/release/${binary_name}"
+            mv "$binpath" "$dirname/${binary_name}-${{ env.VERSION }}"
+            echo "ASSET=$dirname/${binary_name}-${{ env.VERSION }}" >> $GITHUB_ENV
+          fi
 
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            ${{ env.ASSET }}
+          files: ${{ env.ASSET }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
