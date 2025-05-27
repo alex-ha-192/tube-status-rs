@@ -39,6 +39,8 @@ jobs:
       - name: Install platform-specific dependencies
         shell: bash
         run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
           if [[ "${{ matrix.target }}" == "x86_64-unknown-linux-musl" ]]; then
             sudo apt-get update
             sudo apt-get install -y musl-tools pkg-config libssl-dev
@@ -85,5 +87,3 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: ${{ env.ASSET }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
