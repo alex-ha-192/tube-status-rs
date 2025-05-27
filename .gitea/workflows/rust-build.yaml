@@ -1,62 +1,84 @@
-name: Release Multiplatform Rust Binaries
+name: Deploy
 
 on:
   push:
     tags:
-      - 'v*'
+      - "[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: write
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  build-and-upload:
+    name: Build and upload
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        # You can add more, for any target you'd like!
+        include:
+          - build: linux
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+
+          - build: macos
+            os: macos-latest
+            target: x86_64-apple-darwin
+
+          - build: windows
+            os: windows-latest
+            target: x86_64-pc-windows-gnu
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
+      - name: Get the release version from the tag
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+      - name: Install Rust
+        # Or @nightly if you want
+        uses: dtolnay/rust-toolchain@stable
+        # Arguments to pass in
         with:
-          toolchain: stable
-          override: true
+          # Make Rust compile to our target (defined in the matrix)
+          targets: ${{ matrix.target }}
 
-      - name: Install cross
-        run: cargo install cross
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: false
+          command: build
+          args: --verbose --release --target ${{ matrix.target }}
 
-      - name: Add targets
+      - name: Build archive
+        shell: bash
         run: |
-          rustup target add x86_64-unknown-linux-gnu
-          rustup target add x86_64-pc-windows-gnu
-          rustup target add x86_64-apple-darwin
+          # Replace with the name of your binary
+          binary_name="get_london_underground"
 
-      - name: Build for Linux
-        run: cross build --release --target x86_64-unknown-linux-gnu
+          dirname="$binary_name-${{ env.VERSION }}-${{ matrix.target }}"
+          mkdir "$dirname"
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            mv "target/${{ matrix.target }}/release/$binary_name.exe" "$dirname"
+          else
+            mv "target/${{ matrix.target }}/release/$binary_name" "$dirname"
+          fi
+          ls
+          mv "$dirname/$binary_name" "$dirname/$binary_name-${{ env.VERSION }}"
+          echo "ASSET=$dirname/$binary_name-${{ env.VERSION }}" >> $GITHUB_ENV
 
-      - name: Build for Windows
-        run: cross build --release --target x86_64-pc-windows-gnu
+      #     if [ "${{ matrix.os }}" = "windows-latest" ]; then
+      #       7z a "$dirname.zip" "$dirname"
+      #       echo "ASSET=$dirname.zip" >> $GITHUB_ENV
+      #     else
+      #       tar -czf "$dirname.tar.gz" "$dirname"
+      #       echo "ASSET=$dirname.tar.gz" >> $GITHUB_ENV
+      #     fi
 
-      - name: Build for macOS
-        run: cross build --release --target x86_64-apple-darwin
-
-      - name: Upload Linux Binary
-        uses: https://gitea.com/actions/upload-release-asset@v1
+      - name: Release
+        uses: softprops/action-gh-release@v1
         with:
-          token: ${{ secrets.GITEAPAT }}
-          tag: ${{ gitea.ref_name }}
-          asset_path: target/x86_64-unknown-linux-gnu/release/get_london_underground
-          asset_name: get_london_underground-linux
-
-      - name: Upload Windows Binary
-        uses: https://gitea.com/actions/upload-release-asset@v1
-        with:
-          token: ${{ secrets.GITEAPAT }}
-          tag: ${{ gitea.ref_name }}
-          asset_path: target/x86_64-pc-windows-gnu/release/get_london_underground.exe
-          asset_name: get_london_underground-windows.exe
-
-      - name: Upload macOS Binary
-        uses: https://gitea.com/actions/upload-release-asset@v1
-        with:
-          token: ${{ secrets.GITEAPAT }}
-          tag: ${{ gitea.ref_name }}
-          asset_path: target/x86_64-apple-darwin/release/get_london_underground
-          asset_name: get_london_underground-macos
+          files: |
+            ${{ env.ASSET }}
