@@ -1,3 +1,5 @@
+// See license for copyright information
+
 use colored::Colorize;
 use serde_json::Value;
 use std::collections::HashMap;
