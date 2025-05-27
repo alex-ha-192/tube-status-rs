@@ -3,6 +3,7 @@
 use colored::Colorize;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::env;
 
 fn trim_outer_quotes(s: &mut String) -> String {
     s.remove(0);
@@ -19,7 +20,8 @@ fn trim_full_stop(s: &mut String) -> String {
     s_upper_section.clone()
 }
 
-fn print_color_and_desc(v: &Value) {
+fn print_color_and_desc(v: &Value, args: &Vec<String>) {
+    let exclude_full_stop = args.contains(&"--only-one-sentence".to_string());
     let lines_to_colors: HashMap<String, [u8; 3]> = HashMap::from([
         ("Bakerloo".to_string(), [178, 99, 0]),
         ("Central".to_string(), [220, 36, 31]),
@@ -70,15 +72,25 @@ fn print_color_and_desc(v: &Value) {
         let status_reason_trimmed = status_reason_iter
             .next()
             .expect("Failed to parse status reason");
-        println!(
-            "{}:{}",
-            name_of_line.truecolor(rgb[0], rgb[1], rgb[2]),
-            status_reason_trimmed.to_string()
-        );
+        if !exclude_full_stop {
+            println!(
+                "{}:{}",
+                name_of_line.truecolor(rgb[0], rgb[1], rgb[2]),
+                status_reason_trimmed.to_string()
+            );
+        }
+        else {
+            println!(
+                "{}:{}",
+                name_of_line.truecolor(rgb[0], rgb[1], rgb[2]),
+                trim_full_stop(&mut status_reason_trimmed.to_string())
+            );
+        }
     }
 }
 
 fn main() {
+    let args: Vec<String> = env::args().collect();
     let tfl_response: String =
         reqwest::blocking::get("https://api.tfl.gov.uk/line/mode/tube/status")
             .expect("Failed to make the API request")
@@ -88,6 +100,6 @@ fn main() {
     let response: Vec<Value> =
         serde_json::from_str(tfl_response.as_str()).expect("Failed to serialize API response");
     for entry in response {
-        print_color_and_desc(&entry);
+        print_color_and_desc(&entry, &args);
     }
 }
