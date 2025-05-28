@@ -174,7 +174,6 @@ version = "0.1.0"
 dependencies = [
  "colored",
  "reqwest",
- "serde",
  "serde_json",
 ]
 
