@@ -5,12 +5,15 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::env;
 
+/// This function assumes that the outer quotes of a string are the first and last characters in the string.
 fn trim_outer_quotes(s: &mut String) -> String {
     s.remove(0);
     s.remove(s.len() - 1);
     s.clone()
 }
 
+/// This function will trim everything up until the first full stop/period encountered.
+/// This means that this function will truncate a long string to only its first sentence.
 fn trim_full_stop(s: &mut String) -> String {
     let mut s_iter = s.split(".");
     let s_upper_section = s_iter
@@ -20,6 +23,8 @@ fn trim_full_stop(s: &mut String) -> String {
     s_upper_section.clone()
 }
 
+/// This function expects a response v directly from the TfL API and expects it to meet the TfL API's format.
+/// This function cannot be reused for other responses.
 fn print_color_and_desc(v: &Value, args: &Vec<String>) {
     let exclude_full_stop = args.contains(&"--only-one-sentence".to_string());
     let lines_to_colors: HashMap<String, [u8; 3]> = HashMap::from([
@@ -67,14 +72,14 @@ fn print_color_and_desc(v: &Value, args: &Vec<String>) {
             status_severity_description
         );
     } else {
-        let mut status_reason_iter = status_reason.split(":");
+        let mut status_reason_iter = status_reason.split(": ");
         let _ = status_reason_iter.next();
         let status_reason_trimmed = status_reason_iter
             .next()
             .expect("Failed to parse status reason");
         if !exclude_full_stop {
             println!(
-                "{}:{}",
+                "{}: {}",
                 name_of_line.truecolor(rgb[0], rgb[1], rgb[2]),
                 status_reason_trimmed.to_string()
             );
