@@ -14,6 +14,7 @@ fn trim_outer_quotes(s: &mut String) -> String {
 
 /// This function will trim everything up until the first full stop/period encountered.
 /// This means that this function will truncate a long string to only its first sentence.
+/// This should not be used, --only-one-sentence should be deprecated
 fn trim_full_stop(s: &mut String) -> String {
     let mut s_iter = s.split(".");
     let s_upper_section = s_iter
@@ -96,6 +97,9 @@ fn print_color_and_desc(v: &Value, args: &Vec<String>) {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+
+    println!("/// TFL status ///");
+
     let tfl_response: String =
         reqwest::blocking::get("https://api.tfl.gov.uk/line/mode/tube/status")
             .expect("Failed to make the API request")
