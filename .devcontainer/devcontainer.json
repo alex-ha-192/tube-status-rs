@@ -4,7 +4,6 @@
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2.12.2": {}
   },
-  "postCreateCommand": "cargo init",
   "customizations": {
     "vscode": {
       "settings": {},
