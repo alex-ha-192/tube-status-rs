@@ -1,5 +1,7 @@
 // See license for copyright information
 
+// I'm aware async is utterly impractical for something this small, I just wanted to play around with async/concurrency
+
 use colored::Colorize;
 use serde_json::Value;
 use std::collections::HashMap;
