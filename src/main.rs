@@ -5,11 +5,8 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::env;
 
-fn make_request_to_text(url: &str) -> String {
-    return reqwest::blocking::get(url)
-        .expect("Failed to make the API request")
-        .text()
-        .expect("Failed to convert API request to text");
+async fn make_request_to_text(url: &str) -> String {
+    return reqwest::get(url).await.unwrap().text().await.unwrap();
 }
 
 /// This function assumes that the outer quotes of a string are the first and last characters in the string.
@@ -101,17 +98,19 @@ fn print_color_and_desc(v: &Value, args: &Vec<String>) {
     }
 }
 
-fn main() {
+
+#[tokio::main]
+async fn main() {
     let args: Vec<String> = env::args().collect();
 
     println!("/// TFL status ///");
 
-    let tfl_response = make_request_to_text("https://api.tfl.gov.uk/line/mode/tube/status");
+        let tfl_response = make_request_to_text("https://api.tfl.gov.uk/line/mode/tube/status");
 
-    let response: Vec<Value> =
-        serde_json::from_str(tfl_response.as_str()).expect("Failed to serialize API response");
+        let response: Vec<Value> =
+            serde_json::from_str(tfl_response.await.as_str()).expect("Failed to serialize API response");
 
-    for entry in response {
-        print_color_and_desc(&entry, &args);
-    }
+        for entry in response {
+            print_color_and_desc(&entry, &args);
+}
 }
