@@ -5,6 +5,7 @@
 use colored::Colorize;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::env;
 
 async fn make_request_to_text(url: &str) -> String {
     return reqwest::get(url).await.unwrap().text().await.unwrap();
@@ -17,9 +18,19 @@ fn trim_outer_quotes(s: &mut String) -> String {
     s.clone()
 }
 
+fn get_severity(line_status: &Vec<Value>) -> String {
+    let mut status_severity_description = line_status[0]
+        .get("statusSeverityDescription")
+        .expect("Failed to parse status severity description")
+        .to_string();
+    trim_outer_quotes(&mut status_severity_description);
+
+    return status_severity_description;
+}
+
 /// This function expects a response v directly from the TfL API and expects it to meet the TfL API's format.
 /// This function cannot be reused for other responses.
-async fn print_color_and_desc(v: Value) -> String {
+async fn print_color_and_desc(v: Value) -> (String, String) {
     let lines_to_colors: HashMap<String, [u8; 3]> = HashMap::from([
         ("Bakerloo".to_string(), [178, 99, 0]),
         ("Central".to_string(), [220, 36, 31]),
@@ -43,11 +54,8 @@ async fn print_color_and_desc(v: Value) -> String {
             .as_str(),
     )
     .expect("Failed to parse line_status");
-    let mut status_severity_description = line_status[0]
-        .get("statusSeverityDescription")
-        .expect("Failed to parse status severity description")
-        .to_string();
-    trim_outer_quotes(&mut status_severity_description);
+
+    let status_severity_description = get_severity(&line_status);
 
     let mut status_reason: String = String::new();
     if status_severity_description != "Good Service" {
@@ -59,10 +67,13 @@ async fn print_color_and_desc(v: Value) -> String {
     }
     let good_service = status_severity_description == "Good Service";
     if good_service {
-        return format!(
-            "{}: {}",
-            name_of_line.truecolor(rgb[0], rgb[1], rgb[2]),
-            status_severity_description
+        return (
+            name_of_line.clone(),
+            format!(
+                "{}: {}",
+                name_of_line.truecolor(rgb[0], rgb[1], rgb[2]),
+                status_severity_description
+            ),
         );
     } else {
         let mut status_reason_iter = status_reason.split(": ");
@@ -70,32 +81,49 @@ async fn print_color_and_desc(v: Value) -> String {
         let status_reason_trimmed = status_reason_iter
             .next()
             .expect("Failed to parse status reason");
-        return format!(
-            "{}: {}",
-            name_of_line.truecolor(rgb[0], rgb[1], rgb[2]),
-            status_reason_trimmed.to_string()
+        return (
+            name_of_line.clone(),
+            format!(
+                "{}: {}",
+                name_of_line.truecolor(rgb[0], rgb[1], rgb[2]),
+                status_reason_trimmed.to_string()
+            ),
         );
     }
 }
 
 #[tokio::main]
 async fn main() {
-    println!("/// TFL status ///");
+    let args: Vec<String> = env::args().collect();
+    // args[0] is useless
 
     let tfl_response = make_request_to_text("https://api.tfl.gov.uk/line/mode/tube/status");
 
     let response: Vec<Value> = serde_json::from_str(tfl_response.await.as_str())
         .expect("Failed to serialize API response");
 
-    let mut outputs = vec![];
+    let mut outputs: Vec<(String, String)> = vec![];
 
     // Output order of lines is non-deterministic
     for entry in response {
-        // print_color_and_desc(&entry);
-        outputs.push(tokio::spawn(print_color_and_desc(entry)));
+        // Unfortunately, to deal with taking user args, we need to collapse futures here
+        // This could probably be avoided in the future
+        let output = tokio::spawn(print_color_and_desc(entry)).await.unwrap();
+        outputs.push((output.0, output.1));
     }
 
-    for item in outputs {
-        println!("{}", item.await.unwrap())
+    if args.len() == 1 {
+        // Proceed as normal
+        for item in &outputs {
+            println!("{}", item.1)
+        }
+    } else {
+        for i in 1..args.len() {
+            for item in &outputs {
+                if item.0 == args[i] {
+                    println!("{}", item.1);
+                }
+            }
+        }
     }
 }
